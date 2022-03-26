@@ -1,0 +1,452 @@
+---
+title: "EX. RESEARCH DESIGN FINAL PROJECT"
+author: "Della Gatta Antonio"
+date: ""
+output: 
+  html_document: 
+    code_folding: hide
+    theme: journal
+    highlight: pygments
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+#install.packages("palmerpenguins")
+library(palmerpenguins)
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+```
+
+# Palmer Penguin data
+
+### dataset
+
+The Palmer penguins dataset by Allison Horst, Alison Hill, and Kristen Gorman was first made publicly available as an R package.
+
+Size measurements, clutch observations, and blood isotope ratios for 344 adult foraging Adelie, Chinstrap, and Gentoo penguins observed on islands in the Palmer Archipelago near Palmer Station, Antarctica.
+
+The variables in the dataset are:
+
+-   **species**
+
+-   **island**
+
+-   **bill length**
+
+-   **bill depth**
+
+-   **flipper length**
+
+-   **body max**
+
+-   **sex**
+
+-   **year**
+
+```{r, message=FALSE, warning=FALSE,  comment=""}
+
+dat<- penguins
+dat <- na.omit(dat)
+
+dat<- dat[-c(259,260,263), ]
+
+#View(penguins)
+#View(dat)
+
+dat
+```
+
+### bill length by sex
+
+As a first analysis I would focus my attention on the male and female penguins of the "Adelie" species
+
+Let's test with a two sample unpaired t-test
+
+H0 : there's no difference between the bill length of the male and female penguins *(μM=μF)*
+
+H1: there's difference between the bill length of the male and female penguins *(μM≠μF)*
+
+**display our data\
+**
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+library(tseries)
+library(dplyr)
+
+new_male <- dat %>%
+  filter(species == 'Adelie' & sex == 'male')
+
+new_female <- dat %>%
+  filter(species == 'Adelie' & sex == 'female')
+
+
+male<- new_male[,3] #select only value of interest
+male<- as.numeric(unlist(male)) #eliminate list
+
+female<- new_female[,3] #select only value of interest
+female<- as.numeric(unlist(female)) #eliminate list
+```
+
+Let's display our data in order to see graphically if there are already some difference.
+
+```{r, warning=FALSE, message=FALSE}
+
+par(mfrow=c(1,2))
+boxplot(male, main ="male", col ="orange")
+boxplot(female, main = "female", col ="yellow")
+```
+
+**check for normality**
+
+```{r, warning=FALSE, message=FALSE, comment=""}
+
+shapiro.test(male)
+
+
+
+shapiro.test(female)
+
+```
+
+since that the value is not less than 0.5 we can say that, our data, are normally distributed.
+
+**we can also display it graphically**
+
+```{r, message=FALSE, warning=FALSE, comment=""}
+
+par(mfrow=c(1,2))
+
+x1<- hist(male, col='steelblue')
+x2<- hist(female,col='steelblue')
+
+
+
+```
+
+**check for "equal" variances**
+
+sd(male)/sd(female) should not be greater than 2.
+
+In this case we'll use an F- test.\\
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+
+
+var.test(male, female, 
+         alternative = "two.sided")
+```
+
+The p-value of **F-test** is p = 0.3296 which is greater than the significance level 0.05. In conclusion, there is no significant difference between the two variances.
+
+So we can say that there's homogeneity of variances
+
+### check for outliers
+
+```{r, message=FALSE, warning=FALSE,  comment=""}
+par(mfrow=c(1,2))
+boxplot(male,main = "male", col ="orange")
+outliers_values=boxplot.stats(male)
+outliers_values
+
+boxplot(female,main = "female", col ="yellow")
+outliers_values=boxplot.stats(female)$out
+outliers_values
+```
+
+### remove outliers for male
+
+```{r, message=FALSE, warning=FALSE,  comment=""}
+remove_outliers_iqr=function(x){
+  IQR=summary(x)[5]-summary(x)[2]
+  up_out=summary(x)[5]+1.5*IQR
+  down_out=summary(x)[2]-1.5*IQR
+  out_data=c(which(x<down_out), which(x>up_out))
+  x_new=x[-out_data]
+  print(length(x_new))
+  boxplot(x_new)
+  summary(x_new)}
+
+
+
+remove_outliers_iqr(male)
+
+```
+
+now let's perform our test
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+source('http://www.sthda.com/upload/rquery_t_test.r')
+rquery.t.test(male, female, paired=FALSE)
+```
+
+There aren't enough evidence to claim that the null hypothesis is true.
+
+The means of the bill length of the penguins are different
+
+## Difference of flipper length by species and sex
+
+Now we can focus our research on the difference of flipper length of three species of penguins.
+
+We can also divide them by sex. The test that we can use is a two way anova.
+
+### Two-way ANOVA test hypotheses
+
+1.  There is no difference in the means of first factor
+
+2.  There is no difference in means of second factor
+
+3.  There is no interaction between factors 
+
+The alternative hypothesis for cases 1 and 2 is: the means are not equal.
+
+The alternative hypothesis for case 3 is: there is an interaction between factor
+
+let's see our data
+
+```{r, message=FALSE, warning=FALSE, comment=""}
+str(dat)
+```
+
+**Balanced design?**
+
+```{r, message=FALSE, warning=FALSE,  comment=""}
+table(dat$species, dat$sex)
+
+```
+
+**display our data**
+
+```{r, message=FALSE, warning=FALSE,  comment=""}
+
+library("ggpubr")
+
+ggboxplot(dat, x = "species", y = "flipper_length_mm", color = "sex",
+          palette = c("#00AFBB", "#E7B800"))
+
+ggline(dat, x = "species", y = "flipper_length_mm", color = "sex",
+       add = c("mean_se", "dotplot"),
+       palette = c("#00AFBB", "#E7B800"))
+
+
+```
+
+Remove outliers
+
+there aren't significant outliers
+
+```{r, message=FALSE, warning=FALSE, comment=""}
+#find Q1, Q3, and interquartile range for values in column A
+
+df<- dat
+
+Q1 <- quantile(df$flipper_length_mm, .25)
+Q3 <- quantile(df$flipper_length_mm, .65)
+IQR <- IQR(df$flipper_length_mm)
+
+#only keep rows in dataframe that have values within 1.5*IQR of Q1 and Q3
+no_outlier <- subset(df, df$flipper_length_mm > (Q1 - 1.5*IQR) & df$flipper_length_mm < (Q3 + 1.5*IQR))
+
+#view row and column count of new data frame
+print("dimension dataset always equal : 330   8")
+#dim(no_outlier) 
+
+
+
+```
+
+**Check for normality**
+
+```{r, message=FALSE, warning=FALSE, comment=""}
+library(rstatix)
+
+ no_outlier %>%
+  group_by(species,sex) %>%
+  shapiro_test(flipper_length_mm)
+
+```
+
+the p-value is never lower than 0.05
+
+-   normality checked
+
+------------------------------------------------------------------------
+
+**now let's run our test**
+
+Two-way interaction plot
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+
+library(stats)
+interaction.plot(x.factor = no_outlier$species, trace.factor = no_outlier$sex, 
+                 response = no_outlier$flipper_length_mm, fun = mean, 
+                 type = "b", legend = TRUE, 
+                 xlab = "species", ylab="flipper_length_mm",
+                 pch=c(1,19), col = c("#00AFBB", "#E7B800"))
+
+
+
+```
+
+Two-way ANOVA with interaction effect
+
+```{r, message=FALSE, warning=FALSE, comment=""}
+mod2 <- aov(flipper_length_mm ~ sex + species, data = no_outlier)
+summary(mod2)
+
+```
+
+Two-way ANOVA without interaction effect
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+
+
+mod3 <- aov(flipper_length_mm ~ sex * species, data = no_outlier)
+summary(mod3)
+
+```
+
+**check for normality of the residuals**
+
+first plot
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+# 2. Normality
+plot(mod3, 2)
+```
+
+then use the shapiro test
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+# Extract the residuals
+aov_residuals <- residuals(object = mod3)
+# Run Shapiro-Wilk test
+shapiro.test(x = aov_residuals )
+```
+
+-   checked
+
+**check for HOMOSCEDASTICITY**
+
+first plot residuals
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE}
+
+
+plot(mod3, 1)
+```
+
+Use the **Levene's test** to check the **homogeneity of variances**. The function **leveneTest**() [in **car** package] will be used:
+
+```{r, warning=FALSE, message=FALSE}
+library(car)
+library(PMCMRplus)
+leveneTest(flipper_length_mm ~ species * sex, data = no_outlier)
+
+
+
+```
+
+try another test
+
+```{r, warning=FALSE, message=FALSE}
+hartleyTest(flipper_length_mm ~ interaction(sex,species), data = no_outlier)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(onewaytests)
+
+welch.test(flipper_length_mm ~ interaction(sex,species), data = no_outlier)
+```
+
+-   **homogeneity of variances not present**
+
+## bill length by island
+
+Another interesting aspect was to understand if the bill length could have changed from an island to another.
+
+So I've completed this task thanks to a non parametric test
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+#View(dat)
+new_m <- dat %>%
+  filter(island == 'Dream')
+
+
+new_f <- dat %>%
+  filter(island == 'Biscoe')
+
+
+dream<- new_m[1:100,3] #select only value of interest
+dream<- as.numeric(unlist(dream)) #eliminate list
+
+biscoe<- new_f[1:100,3] #select only value of interest
+biscoe<- as.numeric(unlist(biscoe)) #eliminate list
+```
+
+check normality
+
+```{r, comment="", warning=FALSE, message=FALSE}
+shapiro.test(dream)
+
+shapiro.test(biscoe)
+```
+
+the p value is lower than 0.05 so, in this case, the value of the bill length is not normally distributed.
+
+-   check variances
+
+```{r, warning=FALSE, message=FALSE,, comment=""}
+fligner.test(dream ~ biscoe)
+```
+
+### does the median value of the penguins on the first island differ from the median of the penguin on the second one?
+
+**display our data**
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+
+my_data <- data.frame( 
+  group = rep(c("dream", "biscoe"), each = 100),
+  weight = c(dream,  biscoe)
+)
+
+
+ggboxplot(my_data, x = "group", y = "weight", 
+
+          color = "group", palette = c("red", "pink"),
+
+          ylab = "Weight", xlab = "Groups")
+
+
+```
+
+**run our test**
+
+```{r, message=FALSE, warning=FALSE, , comment=""}
+res <- wilcox.test(dream , biscoe)
+
+res
+```
+
+it doesn't seem that there's a real difference.
+
+**effect size**
+
+```{r, warning=FALSE, message=FALSE,  comment=""}
+library(coin)
+my_data %>% wilcox_effsize(weight ~ group)
+```
+
+The Wilcoxon test showed that the difference was not significant (p \> 0.05, effect size r = 0.0313).
+
+
